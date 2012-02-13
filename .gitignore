@@ -1,3 +1,6 @@
 *.class
 *.pyc
 *.pyo
+.project
+.settings
+master

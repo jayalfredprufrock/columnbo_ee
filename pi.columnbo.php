@@ -31,7 +31,7 @@
 
 $plugin_info = array(
                         'pi_name'			=> 'Column-bo',
-                        'pi_version'		=> '1.0',
+                        'pi_version'		=> '1.3',
                         'pi_author'			=> 'Andrew Smiley',
                         'pi_author_url'		=> 'http://proteanweb.com',
                         'pi_description'	=> 'Display data in columns for lists and tables, with entries spread vertically or horizontally.',
@@ -49,10 +49,17 @@ class Columnbo {
 
 	function lists(){
 		
-		//grab all the parameters
 		
-        $tagdata = $this->EE->TMPL->tagdata;
-        $delimiter = $this->EE->TMPL->fetch_param('delimiter', '<br />');
+        $tagdata = trim($this->EE->TMPL->tagdata);
+		
+		$no_results = $this->EE->TMPL->fetch_param('no_results', '');
+		$delimiter = $this->EE->TMPL->fetch_param('delimiter', '<br />');
+		
+		if (!$tagdata || $tagdata == $delimiter){
+			return $no_results;
+		}
+		
+		//grab all the parameters
         $columns = $this->EE->TMPL->fetch_param('columns', 2);
 		$direction = strtolower($this->EE->TMPL->fetch_param('direction', 'horizontal'));
 		$remove_delimiter = strtolower($this->EE->TMPL->fetch_param('remove_delimiter','no'));
@@ -65,9 +72,14 @@ class Columnbo {
 			$output[$i] = $open;
 		}
 		
+		//remove trailing delimiter
+		if (substr($tagdata,-strlen($delimiter)) == $delimiter){
+			$tagdata = substr($tagdata,0,-strlen($delimiter));
+		}
+		
+		
 		//add the data
-      	$rows = explode($delimiter, trim($tagdata));
-		array_pop($rows);
+      	$rows = explode($delimiter, $tagdata);
 		
 		if ($direction == 'vertical'){
 			
@@ -111,15 +123,29 @@ class Columnbo {
 	function table(){
 		
 		//grab all the parameters		
-        $tagdata = $this->EE->TMPL->tagdata;
-        $columns = $this->EE->TMPL->fetch_param('columns', 2);
+        $tagdata = trim($this->EE->TMPL->tagdata);
+		
+		$no_results = $this->EE->TMPL->fetch_param('no_results', '');
+		$delimiter = $this->EE->TMPL->fetch_param('delimiter', '|');
+		
+		if (!$tagdata || $tagdata == $delimiter){
+			return $no_results;
+		}
+			
+        $columns = max(1,$this->EE->TMPL->fetch_param('columns', 2));
+		
+		
 		$direction = strtolower($this->EE->TMPL->fetch_param('direction', 'horizontal'));
 		$delimiter = $this->EE->TMPL->fetch_param('delimiter', '|');
 		$overflow = strtolower($this->EE->TMPL->fetch_param('overflow','empty'));
 		
+		
 		$tmpl = array (
 		
                     'table_open'          => $this->EE->TMPL->fetch_param('table_open','<table border="0" cellpadding="0" cellspacing="0">'),
+
+					'tbody_open'		  => $this->EE->TMPL->fetch_param('tbody_open','<tbody>'),
+					'tbody_close'		  => $this->EE->TMPL->fetch_param('tbody_close','</tbody>'),
 
                     'row_start'           => $this->EE->TMPL->fetch_param('row_start','<tr>'),
                     'row_end'             => $this->EE->TMPL->fetch_param('row_end','</tr>'),
@@ -136,10 +162,13 @@ class Columnbo {
 		 
 		$this->EE->load->library('table');
 
+		//remove trailing delimiter
+		if (substr($tagdata,-strlen($delimiter)) == $delimiter){
+			$tagdata = substr($tagdata,0,-strlen($delimiter));
+		}
+
 		//add the data
-      	$rows = explode($delimiter, trim($tagdata));
-		array_pop($rows);
-		
+      	$rows = explode($delimiter, $tagdata);
 		
 		//need to reorder the columns
 		if ($direction == 'vertical'){
@@ -152,6 +181,7 @@ class Columnbo {
 				}	
 			}
 		}
+
 			
 		if ($overflow == 'table'){
 			
@@ -162,6 +192,9 @@ class Columnbo {
 				$otmpl = array(
 				
 				  		'table_open'          => $this->EE->TMPL->fetch_param('otable_open',$tmpl['table_open']),
+				  		
+						'tbody_open'          => $this->EE->TMPL->fetch_param('otbody_open',$tmpl['tbody_open']),
+						'tbody_close'         => $this->EE->TMPL->fetch_param('otbody_close',$tmpl['tbody_close']),
 	
 	                    'row_start'           => $this->EE->TMPL->fetch_param('orow_start',$tmpl['row_start']),
 	                    'row_end'             => $this->EE->TMPL->fetch_param('orow_end',$tmpl['row_end']),
@@ -181,8 +214,10 @@ class Columnbo {
 				//build table
 				$this->EE->table->set_template(str_replace(array('#rem#','#col#'),array($remainder,$columns),$tmpl)); 		
 				$rows = $this->EE->table->make_columns(array_slice($rows,0,-$remainder),$columns);
-				foreach($rows as $row){
-					$this->EE->table->add_row($row);
+				if ($rows){
+					foreach($rows as $row){
+						$this->EE->table->add_row($row);
+					}
 				}
 				
 				//add overflow table to table
@@ -192,8 +227,9 @@ class Columnbo {
 			}
 		 }
 
-		 //Columbo knew what was going on all along...
+		 //columnbo knew what was going on all along...
 		 $this->EE->table->set_template(str_replace(array('#rem#','#col#'),array(0,$columns),$tmpl)); 
+		 
 		 return $this->EE->table->generate($this->EE->table->make_columns($rows, $columns));
 
 	}
@@ -238,7 +274,7 @@ Sets the number of columns.
 
 delimiter = "<br />"
 This is the string used to separate the data into rows. 
-Be sure it won't actually appear within the data itself, or problems will arise that even Columno can't solve.
+Be sure it won't actually appear within the data itself, or problems will arise that even Columbo can't solve.
 
 direction = "horizontal"
 Controls the direction entries move throughout the list.
@@ -253,11 +289,16 @@ The markup used to start a new column
 close = ""
 The markup used to end a column
 
+no_results = ""
+What to display if tagdata is empty or only the delimiter is found within the tag pair.
+
 
 --- Example ---
-{exp:channel:entries channel="murder-suspects" columns="3" open="<ul>" close="</ul>" delimiter="</li>" }
-	<li>{title}</li>
-{/exp:channel:entries}
+{exp:columnbo:lists columns="3" open="<ul>" close="</ul>" delimiter="</li>"    }
+   {exp:channel:entries channel="murder-suspects"}
+   <li>{title}</li>
+   {/exp:channel:entries}
+{/exp:columnbo:lists}
 
 --- Output ---
 
@@ -289,16 +330,21 @@ Controls the direction entries move throughout the list.
 Acceptable values are "horizontal" and "vertical"
 
 overflow = "empty"
-When the number of columns doesn't evenly divide the rows, Columbo isn't
+When the number of columns doesn't evenly divide the rows, columnbo isn't
 sure what to do. When overflow is set to "empty", empty cells are created
 to finish the final row.
 When overflow="table", the final row is a single spanned column containing a new one-row table 
 containing the remaining table cells.
 
+no_results = ""
+What to display if tagdata is empty or only the delimiter is found within the tag pair.
+
 Since the CI table library is used to generate the table, the majority of the table template options
 are included as parameters with this plugin:
 
 table_open = "<table border="0" cellpadding="0" cellspacing="0">"
+tbody_open = "<tbody>"
+tbody_close = "</tbody>"
 row_start = "<tr>"
 row_end = "</tr>"
 cell_start = "<td>"
@@ -310,8 +356,10 @@ cell_alt_end = "</td>"
 table_close = "</table>"	
 
 Furthermore, if the overflow parameter is set to "table", you have some additional parameters that
-are used to create the embedded table. 
+are used to create the embedded table. Ihese values default to the parent table template values. 
 otable_open = "<table border="0" cellpadding="0" cellspacing="0">"
+otbody_open = "<tbody>"
+otbody_close = "</tbody>"
 orow_start = "<tr>"
 orow_end = "</tr>"
 ocell_start = "<td>"
@@ -326,10 +374,11 @@ which will be replaced with the column count parameter and the number of remaini
 
 
 --- Example ---
-{exp:channel:entries channel="murder-suspects" columns="3" delimiter="|" direction="vertical" overflow="table" cell_start="<td class='col-#col#'>" ocell_start="<td class='col-#rem#'>"}
-	{title}|
-{/exp:channel:entries}
-
+{exp:columnbo:table columns="3" delimiter="|" direction="vertical" overflow="table" cell_start="<td class='col-#col#'>" ocell_start="<td class='col-#rem#'>"}
+	{exp:channel:entries channel="murder-suspects"}
+		{title}|
+	{/exp:channel:entries}
+{/exp:columnbo:table}
 --- Output ---
 
 <table border="0" cellpadding="0" cellspacing="0">
@@ -361,8 +410,17 @@ Bugfix - Columbo would be dissapointed...the second parameter of the "trim" func
 string to trim off, but a list of characters to trim off! Decided to pop off the last array item after explode, 
 since there should always be a trailing delimiter.
 
-1.1.1
-Docs had bad examples...
+1.2 
+Added support for the "tbody" table template override
+Bugfix - better delimiter stripping to avoid creating a final empty table row
+Bugfix - table overflow added duplicate row when total count < column count
+
+1.3
+New Feature - no results parameter for when tagdata is empty
+
+1.3.1
+Fixed bad documentation example.
+
 
 <?php
 $buffer = ob_get_contents();
@@ -377,4 +435,4 @@ return $buffer;
 }
 /* END Class */
 /* End of file pi.columnbo.php */
-/* Location: ./system/expressionengine/third_party/columbo/pi.columnbo.php */
+/* Location: ./system/expressionengine/third_party/columnbo/pi.columnbo.php */
